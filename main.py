@@ -1,44 +1,79 @@
+from dataclasses import dataclass
 import requests
 import json
 from dotenv import load_dotenv
 import os
 from pprint import pprint
 
+load_dotenv()
+or_api = os.getenv("OPENROUTER_API")
+yt_api = os.getenv("YOUTUBE_API")
 
-def openrouter_test() -> None:
-    or_api = os.getenv("OPENROUTER_API")
-    response = requests.post(
-        url="https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {or_api}",
-        },
-        data=json.dumps({
-            "model": "meta-llama/llama-4-maverick:free",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "What is the meaning of life?"
-                }
-            ]
-        })
-    )
+@dataclass
+class VideoContext:
+    kind: str
+    channel_title: str # id in the future?
+    description: str
+    tags: list[str]
+    title: str
     
-def youtube_test() -> None:
-    yt_api = os.getenv("YOUTUBE_API")
-
-    id = "VCbzASF9Ryg"
-    part = "snippet"
-
-    rsp = requests.get(
+def get_video_context(id: str):
+    response = requests.get(
         url="https://www.googleapis.com/youtube/v3/videos"
             + f"?id={id}"
             + f"&key={yt_api}"
-            + f"&part={part}"
+            + f"&part=snippet"
+    )
+    response.raise_for_status()
+    data = response.json()["items"][0]
+    return VideoContext(
+        data["kind"],
+        data["snippet"]["channelTitle"],
+        data["snippet"]["description"],
+        data["snippet"]["tags"],
+        data["snippet"]["title"],
     )
 
-    pprint(rsp.json())
+with open("prompt.txt", "r") as f:
+    prompt = f.read()
+
+payload = {
+    "model": "google/gemini-2.5-pro-exp-03-25:free",
+    "messages": [
+        {
+            "role": "developer",
+            "content": [
+                {
+                    "type": "text",
+                    "text": prompt
+                }
+            ]
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": str(get_video_context("r91BkCUYbsI"))
+                }
+            ]
+        }
+    ]
+}
+
+pprint(payload)
+
+response = requests.post(
+    url="https://openrouter.ai/api/v1/chat/completions",
+    headers={
+        "Authorization": f"Bearer {or_api}",
+        "Content-Type": "application/json"
+    },
+    data=json.dumps(payload)
+)
+
+print(response.json())
 
 
-if __name__ == "__main__":
-    load_dotenv()
-    youtube_test()
+# cxt = get_video_context("r91BkCUYbsI")
+# pprint(cxt)
