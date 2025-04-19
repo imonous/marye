@@ -1,0 +1,19 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+  <div class="top-bar">
+    <form action="/search" method="get" class="search-form">
+      <input
+        type="search"
+        name="q"
+        class="search-input"
+        placeholder="Search YouTube…"
+        required
+      />
+      <button type="submit" class="search-button">Search</button>
+    </form>
+  </div>
+  <div class="main-content">
+    {% block main_content %}{% endblock %}
+  </div>
+{% endblock %}

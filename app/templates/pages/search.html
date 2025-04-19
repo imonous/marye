@@ -1,0 +1,23 @@
+{% extends "base/with_topbar.html" %}
+
+{% block main_content %}
+<div class="video-list">
+  {% for video in videos %}
+  <a href="/watch?v={{video.video_id}}" class="video-card">
+    <img
+      src="{{ video.thumbnail.url }}"
+      alt="{{ video.title }}"
+      class="video-thumb"
+    />
+    <div class="video-info">
+      <h3 class="video-title">{{ video.title }}</h3>
+      <p class="video-meta">
+        {{ video.channel_title }}
+        {{ video.published_at }}
+      </p>
+      <!-- <p class="video-desc">{{ video.description }}</p> -->
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}
