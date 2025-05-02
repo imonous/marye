@@ -7,16 +7,19 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import httpx
 
+from app.config import load_config
 from app.lib.marye import Marye
 from app.lib.youtube import YouTube
-
 
 load_dotenv()
 yt_key = os.getenv("YOUTUBE_API")
 or_key = os.getenv("OPENROUTER_API")
+
 client = httpx.AsyncClient()
 yt = YouTube(yt_key, client)
 marye = Marye(or_key, client)
+
+app_config = load_config()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

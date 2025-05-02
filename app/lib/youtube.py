@@ -40,11 +40,12 @@ class SearchResult(BaseModel):
 
 class YouTube:
     URL = "https://www.googleapis.com/youtube/v3"
+    SHORT_DURATION = timedelta(seconds=60)
 
     def __init__(self, api_key: str, client: AsyncClient):
         self.api_key = api_key
         self.client = client
-
+    
     """
     /videos result is not guaranteed to follow the provided order of ids. Hence 
     the extra steps.
@@ -52,7 +53,7 @@ class YouTube:
     /search only returns partial information (e.g. no video duration). Hence the
     extra search.
     """
-    async def search(self, q: str) -> SearchResult:
+    async def search(self, q: str, show_shorts: bool) -> SearchResult:
         resp = await self.client.get(
             f"{YouTube.URL}/search?key={self.api_key}"
             f"&q={q}&part=snippet&type=video&maxResults=50"
@@ -84,10 +85,11 @@ class YouTube:
                 duration = isodate.parse_duration(dur)
             )
         
-        return SearchResult(
-            next_page_token=next_page_token, 
-            items=list([item for item in items.values() if item is not None])
-        )
-
+        items = [item for item in items.values() if item is not None]
+        if not show_shorts:
+            items = [item for item in items if item.duration > YouTube.SHORT_DURATION]
+        
+        return SearchResult(next_page_token=next_page_token, items=items)
+    
     async def close(self):
         await self.client.aclose()
