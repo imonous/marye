@@ -1,6 +1,9 @@
-from typing import Any
+from datetime import timedelta
 from httpx import AsyncClient
+import isodate
 from pydantic import BaseModel, Field, model_validator
+
+from typing import Any, Optional
 
 # TODO: store multiple res
 class Thumbnail(BaseModel):
@@ -8,17 +11,19 @@ class Thumbnail(BaseModel):
     width: int
     height: int
 
+    def __repr__(self) -> str:
+        return f"Thumbnail(url={self.url})"
+
 # TODO: explore other video properties
 class VideoEntry(BaseModel):
-    id: str = Field(..., alias="videoId")
-    kind: str
+    id: str
     title: str
     description: str 
     channel_title: str = Field(..., alias="channelTitle")
     published_at: str = Field(..., alias="publishedAt")
-    thumbnail: Thumbnail = Field(default=None, alias="high")
-    tags: list[str]
-    duration: str = None
+    thumbnail: Thumbnail = Field(..., alias="high")
+    tags: Optional[list[str]] = None
+    duration: timedelta
 
     def promptify(self) -> str:
         return (
@@ -31,7 +36,7 @@ class VideoEntry(BaseModel):
 
 class SearchResult(BaseModel):
     items: list[VideoEntry]
-    next_page_token: str = Field(..., alias="nextPageToken")
+    next_page_token: str
 
 class YouTube:
     URL = "https://www.googleapis.com/youtube/v3"
@@ -40,40 +45,49 @@ class YouTube:
         self.api_key = api_key
         self.client = client
 
+    """
+    /videos result is not guaranteed to follow the provided order of ids. Hence 
+    the extra steps.
+
+    /search only returns partial information (e.g. no video duration). Hence the
+    extra search.
+    """
     async def search(self, q: str) -> SearchResult:
-        req = await self.client.get(
+        resp = await self.client.get(
             f"{YouTube.URL}/search?key={self.api_key}"
             f"&q={q}&part=snippet&type=video&maxResults=50"
         )
-        req.raise_for_status()
+        resp.raise_for_status()
 
-        data = req.json()
-        data = {
-            **data.get("id", {}),
-            **data.get("snippet", {}),
-            **data.get("snippet", {}).get("thumbnails", {})
-        } # flatten
+        data = resp.json()
+        next_page_token = data.get("nextPageToken")
+        items = {item["id"]["videoId"]: None for item in data["items"]}
 
-        return SearchResult(**data)
-    
-    async def deepsearch(self, q: str):
-        res = self.search(q)
-        ids = ",".join(it.id for it in res.items)
-        req = await self.client.get(
+        if not items:
+            return # TODO
+
+        ids = ",".join(items.keys())
+        resp = await self.client.get(
             f"{YouTube.URL}/videos?key={self.api_key}"
-            f"&id={ids}&part=contentDetails"
+            f"&id={ids}&part=snippet,contentDetails"
         )
-        req.raise_for_status()
-        data = req.json()
-        pass
-    
+        resp.raise_for_status()
+
+        data = resp.json()
+        for item in data["items"]:
+            vid = item["id"]
+            dur = item["contentDetails"]["duration"]
+            items[vid] = VideoEntry(
+                id = vid,
+                **item["snippet"],
+                **item["snippet"]["thumbnails"],
+                duration = isodate.parse_duration(dur)
+            )
+        
+        return SearchResult(
+            next_page_token=next_page_token, 
+            items=list([item for item in items.values() if item is not None])
+        )
+
     async def close(self):
         await self.client.aclose()
-
-    # async def get_video_context(self, id: str) -> VideoContext:
-    #     req = await self.client.get(
-    #         f"{YouTube.URL}/videos"
-    #         f"?id={id}&key={self.api_key}&part=snippet"
-    #     )
-    #     req.raise_for_status()
-    #     return VideoContext(**req.json())
