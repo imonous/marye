@@ -1,29 +1,20 @@
 from httpx import AsyncClient
 import json
-from dotenv import load_dotenv
-import os
 
-from app.lib.youtube import VideoContext
+from app.lib.youtube import VideoEntry
 
-load_dotenv()
-or_api = os.getenv("OPENROUTER_API")
-
-
-class Marye:
+class Validator:
     def __init__(self, api_key: str, client: AsyncClient):
         self.api_key = api_key
         self.client = client
-
     
-    async def validate_video(self, video_ctx: VideoContext) -> bool:
-        # with open("prompt.txt", "r") as f:
-        #     prompt = f.read()
+    async def validate(self, video: VideoEntry) -> bool:
         prompt =  (
-            """
-            You are an AI classifier. Given a YouTube video title, description and 
-            (not always) tags determine whether the video is *purely* educational. Respond 
-            only 'True' if the video is educational, otherwise 'False'.
-            """
+        """
+        You are an AI classifier. Given a YouTube video title, description and 
+        (optionally) tags determine whether the video is *purely* educational. 
+        Respond with only 'True' if the video is educational, otherwise 'False'.
+        """
         )
         payload = {
             # "model": "google/gemini-2.5-pro-exp-03-25:free",
@@ -43,7 +34,7 @@ class Marye:
                     "content": [
                         {
                             "type": "text",
-                            "text": video_ctx.promptify()
+                            "text": video.promptify()
                         }
                     ]
                 }
@@ -52,7 +43,7 @@ class Marye:
         response = await self.client.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {or_api}",
+                "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             },
             data=json.dumps(payload)

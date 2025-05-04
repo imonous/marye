@@ -52,6 +52,8 @@ class YouTube:
 
     /search only returns partial information (e.g. no video duration). Hence the
     extra search.
+
+    TODO: result validation
     """
     async def search(self, q: str, show_shorts: bool) -> SearchResult:
         resp = await self.client.get(
@@ -63,9 +65,6 @@ class YouTube:
         data = resp.json()
         next_page_token = data.get("nextPageToken")
         items = {item["id"]["videoId"]: None for item in data["items"]}
-
-        if not items:
-            return # TODO
 
         ids = ",".join(items.keys())
         resp = await self.client.get(
@@ -90,6 +89,24 @@ class YouTube:
             items = [item for item in items if item.duration > YouTube.SHORT_DURATION]
         
         return SearchResult(next_page_token=next_page_token, items=items)
+    
+    async def get_video_context(self, vid: str) -> VideoEntry:
+        resp = await self.client.get(
+            f"{YouTube.URL}/videos?key={self.api_key}"
+            f"&id={vid}&part=snippet,contentDetails"
+        )
+        resp.raise_for_status()
+
+        item = resp.json()["items"][0]
+        return VideoEntry(
+            id = item["id"],
+            **item["snippet"],
+            **item["snippet"]["thumbnails"],
+            duration = isodate.parse_duration(
+                item["contentDetails"]["duration"]
+            )
+        )
+
     
     async def close(self):
         await self.client.aclose()

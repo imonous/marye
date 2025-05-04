@@ -1,11 +1,12 @@
 import json
 from pathlib import Path
-from pydantic import BaseModel, FIeld
+from pydantic import BaseModel, Field
+
+CFG_PATH = Path(__file__).parent.parent / "config.json"
 
 class AppConfig(BaseModel):
     show_shorts: bool
 
 def load_config() -> AppConfig:
-    cfg_file = Path(__file__).parent / "config.json"
-    data = json.loads(cfg_file.read_text())
+    data = json.loads(CFG_PATH.read_text())
     return AppConfig(**data)
